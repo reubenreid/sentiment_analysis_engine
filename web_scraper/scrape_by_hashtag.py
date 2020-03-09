@@ -18,14 +18,18 @@ class TwitterScraper(object):
         maximum_number_of_tweets_to_be_extracted = 1000
 
         # hashtag = input('Enter the hashtag you want to scrape- ')
-        hashtag = 'python'
+        hashtag = 'coronavirus'
 
-        for tweet in tweepy.Cursor(api.search, q='#' + hashtag, rpp=100).items(maximum_number_of_tweets_to_be_extracted):
-            if tweet.geo is not None:
-                print('has geo')
-                with open('raw_tweets_with_hashtag_' + hashtag + '.csv', 'w') as out_file:
-                    writer = csv.writer(out_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-                    writer.writerow([tweet.text, tweet.geo])
+        with open('tweets_' + hashtag + '.csv', 'w') as out_file:
+            writer = csv.writer(out_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            for tweet in tweepy.Cursor(api.search, q='#' + hashtag, rpp=100).items(maximum_number_of_tweets_to_be_extracted):
+                if tweet.user.location is not None:
+                    try:
+                        writer.writerow([tweet.text.replace('\n', ' ').replace('\r', ''), tweet.user.location])
+                    except UnicodeEncodeError:
+                        continue
+                    except:
+                        print('somethings gone very wrong: ' + tweet.text)
 
         print('Extracted ' + str(maximum_number_of_tweets_to_be_extracted) + ' tweets with hashtag #' + hashtag)
 
