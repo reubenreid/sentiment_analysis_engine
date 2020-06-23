@@ -21,9 +21,10 @@ import tensorflow
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 nltk.download('stopwords')
+file_path = "best_model.hdf5"
 
-train = pd.read_csv("training_data/dummy_train.csv",sep=';')
-test = pd.read_csv("training_data/dummy_test.csv",sep=';',quoting=csv.QUOTE_NONE)
+train = pd.read_csv("training_data/dummy_train_half.csv",sep=';')
+test = pd.read_csv("training_data/dummy_test_predict.csv",sep=';',quoting=csv.QUOTE_NONE)
 del test['Unnamed: 1']
 
 train['tweet'] = train['tweet'].apply(lambda x : ' '.join([w for w in x.split() if not w.startswith('@') ])  )
@@ -56,6 +57,7 @@ embedding_index = dict(get_coefs(*o.strip().split(" ")) for o in open(embedding_
 word_index = tk.word_index
 nb_words = min(max_features, len(word_index))
 embedding_matrix = np.zeros((nb_words + 1, embed_size))
+
 for word, i in word_index.items():
     if i >= max_features: continue
     embedding_vector = embedding_index.get(word)
@@ -64,13 +66,12 @@ for word, i in word_index.items():
 
 def build_model1(lr=0.0, lr_d=0.0, units=0, spatial_dr=0.0, kernel_size1=3, kernel_size2=2, dense_units=128, dr=0.1,
                  conv_size=32):
-    file_path = "best_model.hdf5"
     check_point = ModelCheckpoint(file_path, monitor="val_loss", verbose=1,
                                   save_best_only=True, mode="min")
     early_stop = EarlyStopping(monitor="val_loss", mode="min", patience=3)
 
     inp = Input(shape=(max_len,))
-    x = Embedding(530, embed_size, weights=[embedding_matrix], trainable=False)(inp)
+    x = Embedding(3000000, embed_size, weights=[embedding_matrix], trainable=False)(inp)
     x1 = SpatialDropout1D(spatial_dr)(x)
 
     x_gru = Bidirectional(GRU(units, return_sequences=True))(x1) # change to CuDNNGRU for GPU training
@@ -106,7 +107,19 @@ def build_model1(lr=0.0, lr_d=0.0, units=0, spatial_dr=0.0, kernel_size1=3, kern
     return model
 
 
-model = build_model1(lr = 1e-3, lr_d = 1e-10, units = 128, spatial_dr = 0.5, kernel_size1=4, kernel_size2=4, dense_units=64, dr=0.2, conv_size=32)
-predicted = model.predict(X_test)
-predicated_final = np.argmax(predicted, axis=1)
-print("done")
+
+def predict():
+    model = load_model(file_path)
+    predicted = model.predict(X_test)
+    predicted_final = list(map(lambda x: 1 if x >= 0.5 else 0 , predicted))
+    test['prediction'] = predicted_final
+    test.to_csv(r'training_data\predicted.csv', index=False)
+
+
+def train():
+    model = build_model1(lr=1e-3, lr_d=1e-10, units=128, spatial_dr=0.5, kernel_size1=4, kernel_size2=4, dense_units=64,
+                         dr=0.2, conv_size=32)
+
+
+#predict()
+train()
